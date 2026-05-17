@@ -3,7 +3,7 @@ services:
     name: gigflow-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && ./node_modules/.bin/tsc
     startCommand: node dist/server.js
     envVars:
       - key: NODE_ENV
