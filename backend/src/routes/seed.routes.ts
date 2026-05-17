@@ -1,15 +1,14 @@
 import { Router, Request, Response } from 'express';
-import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import User from '../models/User';
 import Lead from '../models/Lead';
 
 const router = Router();
 
-router.post('/run', async (req: Request, res: Response): Promise<void> => {
-  const secret = req.headers['x-seed-secret'];
+const runSeed = async (req: Request, res: Response): Promise<void> => {
+  const secret = req.headers['x-seed-secret'] || req.query['secret'];
   if (secret !== 'gigflow-seed-2024') {
-    res.status(403).json({ error: 'Forbidden' });
+    res.status(403).json({ error: 'Forbidden - pass ?secret=gigflow-seed-2024' });
     return;
   }
 
@@ -36,10 +35,21 @@ router.post('/run', async (req: Request, res: Response): Promise<void> => {
       { name: 'Arun Krishnan', email: 'arun.krishnan@example.com', status: 'Lost', source: 'Referral', createdBy: sales._id },
     ]);
 
-    res.json({ success: true, message: 'Database seeded! 2 users + 10 leads created.', users: ['admin@gigflow.com / admin123', 'sales@gigflow.com / sales123'] });
+    res.json({ 
+      success: true, 
+      message: '✅ Database seeded successfully!',
+      users: [
+        'admin@gigflow.com / admin123 (Admin)',
+        'sales@gigflow.com / sales123 (Sales)'
+      ],
+      leads: '10 sample leads created'
+    });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
   }
-});
+};
+
+router.get('/run', runSeed);
+router.post('/run', runSeed);
 
 export default router;
