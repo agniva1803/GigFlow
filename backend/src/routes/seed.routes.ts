@@ -7,15 +7,18 @@ const router = Router();
 const runSeed = async (req: Request, res: Response): Promise<void> => {
   const secret = req.headers['x-seed-secret'] || req.query['secret'];
   if (secret !== 'gigflow-seed-2024') {
-    res.status(403).json({ error: 'Forbidden - pass ?secret=gigflow-seed-2024' });
+    res.status(403).json({ error: 'Forbidden' });
     return;
   }
+
+  // Prevent caching
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
 
   try {
     await User.deleteMany({});
     await Lead.deleteMany({});
 
-    // Let the User model's pre-save hook handle hashing (don't pre-hash)
     const admin = await User.create({
       name: 'Admin User',
       email: 'admin@gigflow.com',
@@ -43,14 +46,16 @@ const runSeed = async (req: Request, res: Response): Promise<void> => {
       { name: 'Arun Krishnan', email: 'arun.krishnan@example.com', status: 'Lost', source: 'Referral', createdBy: sales._id },
     ]);
 
+    const adminUser = await User.findOne({ email: 'admin@gigflow.com' }).select('+password');
+    const passwordCheck = adminUser ? await adminUser.comparePassword('admin123') : false;
+
     res.json({
       success: true,
-      message: '✅ Database seeded successfully!',
-      users: [
-        'admin@gigflow.com / admin123 (Admin)',
-        'sales@gigflow.com / sales123 (Sales)'
-      ],
-      leads: '10 sample leads created'
+      message: '✅ Database seeded!',
+      passwordVerified: passwordCheck,
+      adminId: admin._id,
+      users: ['admin@gigflow.com / admin123', 'sales@gigflow.com / sales123'],
+      leads: '10 leads created'
     });
   } catch (err) {
     res.status(500).json({ error: (err as Error).message });
