@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
 import User from '../models/User';
 import Lead from '../models/Lead';
 
@@ -16,11 +15,20 @@ const runSeed = async (req: Request, res: Response): Promise<void> => {
     await User.deleteMany({});
     await Lead.deleteMany({});
 
-    const adminPass = await bcrypt.hash('admin123', 12);
-    const salesPass = await bcrypt.hash('sales123', 12);
+    // Let the User model's pre-save hook handle hashing (don't pre-hash)
+    const admin = await User.create({
+      name: 'Admin User',
+      email: 'admin@gigflow.com',
+      password: 'admin123',
+      role: 'admin'
+    });
 
-    const admin = await User.create({ name: 'Admin User', email: 'admin@gigflow.com', password: adminPass, role: 'admin' });
-    const sales = await User.create({ name: 'Sales Rep', email: 'sales@gigflow.com', password: salesPass, role: 'sales' });
+    const sales = await User.create({
+      name: 'Sales Rep',
+      email: 'sales@gigflow.com',
+      password: 'sales123',
+      role: 'sales'
+    });
 
     await Lead.insertMany([
       { name: 'Priya Sharma', email: 'priya.sharma@example.com', status: 'Qualified', source: 'Website', notes: 'Interested in premium plan', createdBy: admin._id },
@@ -35,8 +43,8 @@ const runSeed = async (req: Request, res: Response): Promise<void> => {
       { name: 'Arun Krishnan', email: 'arun.krishnan@example.com', status: 'Lost', source: 'Referral', createdBy: sales._id },
     ]);
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: '✅ Database seeded successfully!',
       users: [
         'admin@gigflow.com / admin123 (Admin)',
