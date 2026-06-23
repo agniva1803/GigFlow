@@ -6,7 +6,6 @@ import {
   Sun,
   Moon,
   ChevronRight,
-  Zap,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { useThemeStore } from '../../store/themeStore';
@@ -38,9 +37,7 @@ export const Sidebar = () => {
       {/* Logo */}
       <div className="p-5 border-b" style={{ borderColor: 'var(--border)' }}>
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center">
-            <Zap className="w-4 h-4 text-white" />
-          </div>
+          <img src="/assets/logo-mark.svg" alt="GigFlow" className="w-8 h-8 rounded-lg flex-shrink-0" />
           <span className="font-display font-bold text-lg" style={{ color: 'var(--text-primary)' }}>
             GigFlow
           </span>

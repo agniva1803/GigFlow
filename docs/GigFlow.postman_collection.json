@@ -1,0 +1,204 @@
+{
+  "info": {
+    "name": "GigFlow API",
+    "description": "REST API for GigFlow — a smart leads dashboard with JWT auth, RBAC, audit trails, and CSV import/export. Import this collection, set base_url (and root_url for the health check) to your deployment, then run Auth > Login first — it auto-saves the token to {{token}} for every other request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:5000/api", "type": "string" },
+    { "key": "root_url", "value": "http://localhost:5000", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "lead_id", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"password1\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/register", "host": ["{{base_url}}"], "path": ["auth", "register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?.token) {",
+                  "  pm.collectionVariables.set('token', json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@gigflow.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] }
+          }
+        },
+        {
+          "name": "Get current user",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leads",
+      "item": [
+        {
+          "name": "List leads",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/leads?page=1&limit=10&sort=latest",
+              "host": ["{{base_url}}"],
+              "path": ["leads"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "sort", "value": "latest" },
+                { "key": "status", "value": "New", "disabled": true },
+                { "key": "source", "value": "Website", "disabled": true },
+                { "key": "search", "value": "priya", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create lead",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json?.data?._id) {",
+                  "  pm.collectionVariables.set('lead_id', json.data._id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Priya Sharma\",\n  \"email\": \"priya@example.com\",\n  \"source\": \"Website\",\n  \"notes\": \"Interested in premium plan\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/leads", "host": ["{{base_url}}"], "path": ["leads"] }
+          }
+        },
+        {
+          "name": "Get lead by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/leads/{{lead_id}}", "host": ["{{base_url}}"], "path": ["leads", "{{lead_id}}"] }
+          }
+        },
+        {
+          "name": "Update lead (status change)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Contacted\"\n}"
+            },
+            "url": { "raw": "{{base_url}}/leads/{{lead_id}}", "host": ["{{base_url}}"], "path": ["leads", "{{lead_id}}"] }
+          }
+        },
+        {
+          "name": "Get lead activity timeline",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/leads/{{lead_id}}/activity",
+              "host": ["{{base_url}}"],
+              "path": ["leads", "{{lead_id}}", "activity"]
+            }
+          }
+        },
+        {
+          "name": "Delete lead",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/leads/{{lead_id}}", "host": ["{{base_url}}"], "path": ["leads", "{{lead_id}}"] }
+          }
+        },
+        {
+          "name": "Bulk import leads",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rows\": [\n    { \"name\": \"Rahul Mehta\", \"email\": \"rahul@example.com\", \"source\": \"Instagram\" },\n    { \"name\": \"Anita Patel\", \"email\": \"anita@example.com\", \"source\": \"Referral\", \"status\": \"Qualified\" }\n  ]\n}"
+            },
+            "url": { "raw": "{{base_url}}/leads/bulk-import", "host": ["{{base_url}}"], "path": ["leads", "bulk-import"] }
+          }
+        },
+        {
+          "name": "Dashboard stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/leads/stats", "host": ["{{base_url}}"], "path": ["leads", "stats"] }
+          }
+        },
+        {
+          "name": "Export leads as CSV",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/leads/export/csv", "host": ["{{base_url}}"], "path": ["leads", "export", "csv"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{root_url}}/health", "host": ["{{root_url}}"], "path": ["health"] }
+          }
+        }
+      ]
+    }
+  ]
+}
