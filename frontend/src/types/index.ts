@@ -68,3 +68,38 @@ export interface CreateLeadData {
 }
 
 export type UpdateLeadData = Partial<CreateLeadData>;
+
+export type ActivityAction = 'created' | 'status_changed' | 'assigned' | 'updated' | 'deleted' | 'note_added';
+
+export interface Activity {
+  _id: string;
+  lead: string;
+  actor: { _id: string; name: string; email: string; role: UserRole } | string;
+  action: ActivityAction;
+  field?: string;
+  fromValue?: string;
+  toValue?: string;
+  message: string;
+  createdAt: string;
+}
+
+export interface BulkImportRow {
+  name: string;
+  email: string;
+  status?: LeadStatus;
+  source: LeadSource;
+  notes?: string;
+}
+
+export interface BulkImportResultError {
+  row: number;
+  name?: string;
+  email?: string;
+  error: string;
+}
+
+export interface BulkImportResult {
+  createdCount: number;
+  errorCount: number;
+  errors: BulkImportResultError[];
+}

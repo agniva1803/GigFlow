@@ -1,5 +1,15 @@
 import api from './axios';
-import type { ApiResponse, Lead, LeadFilters, LeadStats, CreateLeadData, UpdateLeadData } from '../types';
+import type {
+  ApiResponse,
+  Lead,
+  LeadFilters,
+  LeadStats,
+  CreateLeadData,
+  UpdateLeadData,
+  Activity,
+  BulkImportRow,
+  BulkImportResult,
+} from '../types';
 
 export const leadsApi = {
   getLeads: async (filters: Partial<LeadFilters>) => {
@@ -20,6 +30,11 @@ export const leadsApi = {
     return response.data;
   },
 
+  getLeadActivity: async (id: string) => {
+    const response = await api.get<ApiResponse<Activity[]>>(`/leads/${id}/activity`);
+    return response.data;
+  },
+
   createLead: async (data: CreateLeadData) => {
     const response = await api.post<ApiResponse<Lead>>('/leads', data);
     return response.data;
@@ -37,6 +52,11 @@ export const leadsApi = {
 
   getStats: async () => {
     const response = await api.get<ApiResponse<LeadStats>>('/leads/stats');
+    return response.data;
+  },
+
+  bulkImport: async (rows: BulkImportRow[]) => {
+    const response = await api.post<ApiResponse<BulkImportResult>>('/leads/bulk-import', { rows });
     return response.data;
   },
 

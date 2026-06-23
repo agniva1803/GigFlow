@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { leadsApi } from '../api/leads';
 import type { LeadFilters } from '../types';
@@ -8,6 +8,7 @@ import { LeadTable } from '../components/leads/LeadTable';
 import { LeadFiltersBar } from '../components/leads/LeadFiltersBar';
 import { Modal } from '../components/ui/Modal';
 import { LeadForm } from '../components/leads/LeadForm';
+import { BulkImportModal } from '../components/leads/BulkImportModal';
 import { Button } from '../components/ui/Button';
 import { useDebounce } from '../hooks/useDebounce';
 
@@ -24,6 +25,7 @@ export const LeadsPage = () => {
   const [filters, setFilters] = useState<LeadFilters>(DEFAULT_FILTERS);
   const [searchInput, setSearchInput] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 400);
@@ -68,10 +70,16 @@ export const LeadsPage = () => {
               : 'Manage your leads pipeline'}
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Add Lead
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setIsImportOpen(true)}>
+            <Upload className="w-4 h-4" />
+            Import CSV
+          </Button>
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Add Lead
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -131,6 +139,11 @@ export const LeadsPage = () => {
       {/* Create Lead Modal */}
       <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Add New Lead">
         <LeadForm onSuccess={() => setIsCreateOpen(false)} />
+      </Modal>
+
+      {/* Bulk Import Modal */}
+      <Modal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} title="Import Leads from CSV" size="lg">
+        <BulkImportModal onSuccess={() => setIsImportOpen(false)} />
       </Modal>
     </div>
   );

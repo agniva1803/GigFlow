@@ -69,3 +69,23 @@ export interface JwtPayload {
   id: string;
   role: UserRole;
 }
+
+export type ActivityAction =
+  | 'created'
+  | 'status_changed'
+  | 'assigned'
+  | 'updated'
+  | 'deleted'
+  | 'note_added';
+
+export interface IActivity extends Document {
+  _id: Types.ObjectId;
+  lead: Types.ObjectId;
+  actor: Types.ObjectId;
+  action: ActivityAction;
+  field?: string;
+  fromValue?: string;
+  toValue?: string;
+  message: string;
+  createdAt: Date;
+}

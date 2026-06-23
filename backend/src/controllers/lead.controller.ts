@@ -1,8 +1,12 @@
 import { Response } from 'express';
 import { stringify } from 'csv-stringify/sync';
 import Lead from '../models/Lead';
+import Activity from '../models/Activity';
+import User from '../models/User';
 import { AuthRequest, LeadFilterQuery, LeadStatus, LeadSource } from '../types';
 import { sendSuccess, sendError } from '../utils/response';
+import { logActivity, buildUpdateActivities } from '../utils/activityLogger';
+import { sendEmail, buildLeadAssignedEmail, buildStatusChangedEmail } from '../utils/email';
 import { FilterQuery } from 'mongoose';
 import { ILead } from '../types';
 
@@ -127,6 +131,13 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<void>
       createdBy: req.user.id,
     });
 
+    await logActivity({
+      leadId: lead._id,
+      actorId: req.user.id,
+      action: 'created',
+      message: `Lead created from ${source}`,
+    });
+
     const populatedLead = await lead.populate('createdBy', 'name email');
 
     sendSuccess(res, populatedLead, 'Lead created successfully', 201);
@@ -160,6 +171,16 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<void>
       assignedTo: string;
     }>;
 
+    // Snapshot tracked fields before mutation so we can diff after the update
+    const before: Record<string, unknown> = {
+      name: lead.name,
+      email: lead.email,
+      status: lead.status,
+      source: lead.source,
+      notes: lead.notes,
+      assignedTo: lead.assignedTo?.toString(),
+    };
+
     const updatedLead = await Lead.findByIdAndUpdate(
       req.params['id'],
       { name, email, status, source, notes, assignedTo },
@@ -167,6 +188,68 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<void>
     )
       .populate('createdBy', 'name email')
       .populate('assignedTo', 'name email');
+
+    if (updatedLead && req.user) {
+      const after: Record<string, unknown> = {
+        name: updatedLead.name,
+        email: updatedLead.email,
+        status: updatedLead.status,
+        source: updatedLead.source,
+        notes: updatedLead.notes,
+        assignedTo: updatedLead.assignedTo?.toString(),
+      };
+
+      const changes = buildUpdateActivities(before, after, [
+        'status',
+        'assignedTo',
+        'notes',
+        'name',
+        'email',
+        'source',
+      ]);
+
+      await Promise.all(
+        changes.map((change) =>
+          logActivity({
+            leadId: updatedLead._id,
+            actorId: req.user!.id,
+            action: change.action,
+            field: change.field,
+            fromValue: change.fromValue,
+            toValue: change.toValue,
+            message: change.message,
+          })
+        )
+      );
+
+      // Fire notification emails for the two changes a sales rep actually
+      // cares about: getting assigned a lead, and a lead's status moving.
+      // Notification failures are swallowed inside sendEmail and never
+      // affect the API response.
+      const statusChange = changes.find((c) => c.field === 'status');
+      const assignmentChange = changes.find((c) => c.field === 'assignedTo');
+
+      if (statusChange && updatedLead.assignedTo) {
+        const assignee = await User.findById(updatedLead.assignedTo).select('email');
+        if (assignee) {
+          const { subject, html } = buildStatusChangedEmail(
+            updatedLead.name,
+            statusChange.fromValue,
+            statusChange.toValue
+          );
+          await sendEmail({ to: assignee.email, subject, html });
+        }
+      }
+
+      if (assignmentChange && updatedLead.assignedTo) {
+        const assignee = await User.findById(updatedLead.assignedTo).select('email');
+        const assigner = await User.findById(req.user.id).select('name');
+        if (assignee) {
+          const { subject, html } = buildLeadAssignedEmail(updatedLead.name, assigner?.name ?? 'A teammate');
+          await sendEmail({ to: assignee.email, subject, html });
+        }
+      }
+    }
 
     sendSuccess(res, updatedLead, 'Lead updated successfully');
   } catch (error) {
@@ -191,6 +274,7 @@ export const deleteLead = async (req: AuthRequest, res: Response): Promise<void>
     }
 
     await Lead.findByIdAndDelete(req.params['id']);
+    await Activity.deleteMany({ lead: req.params['id'] });
 
     sendSuccess(res, null, 'Lead deleted successfully');
   } catch (error) {
@@ -282,5 +366,136 @@ export const getStats = async (req: AuthRequest, res: Response): Promise<void> =
   } catch (error) {
     console.error('GetStats error:', error);
     sendError(res, 'Failed to fetch stats', 500);
+  }
+};
+
+/**
+ * Returns the audit trail for a single lead, newest first. Used to power
+ * the activity timeline on the lead detail page.
+ */
+export const getLeadActivity = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const lead = await Lead.findById(req.params['id']);
+
+    if (!lead) {
+      sendError(res, 'Lead not found', 404);
+      return;
+    }
+
+    if (req.user?.role === 'sales' && lead.createdBy.toString() !== req.user.id) {
+      sendError(res, 'Access denied', 403);
+      return;
+    }
+
+    const activity = await Activity.find({ lead: req.params['id'] })
+      .sort({ createdAt: -1 })
+      .populate('actor', 'name email role')
+      .lean();
+
+    sendSuccess(res, activity);
+  } catch (error) {
+    console.error('GetLeadActivity error:', error);
+    sendError(res, 'Failed to fetch lead activity', 500);
+  }
+};
+
+interface BulkImportRow {
+  name?: unknown;
+  email?: unknown;
+  status?: unknown;
+  source?: unknown;
+  notes?: unknown;
+}
+
+interface BulkImportResult {
+  row: number;
+  name?: string;
+  email?: string;
+  error: string;
+}
+
+const VALID_STATUSES: LeadStatus[] = ['New', 'Contacted', 'Qualified', 'Lost'];
+const VALID_SOURCES: LeadSource[] = ['Website', 'Instagram', 'Referral'];
+const EMAIL_REGEX = /^\S+@\S+\.\S+$/;
+const MAX_BULK_ROWS = 500;
+
+/**
+ * Bulk-creates leads from a parsed CSV/JSON row array. Validates every row
+ * independently so one bad row doesn't reject the whole batch — the response
+ * reports created count alongside a per-row error list, which is the pattern
+ * spreadsheet-import tools (Stripe, HubSpot, etc.) use.
+ */
+export const bulkImportLeads = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user) {
+      sendError(res, 'Authentication required', 401);
+      return;
+    }
+
+    const { rows } = req.body as { rows?: BulkImportRow[] };
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      sendError(res, 'Request body must include a non-empty "rows" array', 400);
+      return;
+    }
+
+    if (rows.length > MAX_BULK_ROWS) {
+      sendError(res, `Cannot import more than ${MAX_BULK_ROWS} rows in a single request`, 400);
+      return;
+    }
+
+    const errors: BulkImportResult[] = [];
+    const valid: { name: string; email: string; status: LeadStatus; source: LeadSource; notes?: string }[] = [];
+
+    rows.forEach((row, index) => {
+      const rowNum = index + 1;
+      const name = typeof row.name === 'string' ? row.name.trim() : '';
+      const email = typeof row.email === 'string' ? row.email.trim().toLowerCase() : '';
+      const statusRaw = typeof row.status === 'string' ? row.status.trim() : 'New';
+      const sourceRaw = typeof row.source === 'string' ? row.source.trim() : '';
+      const notes = typeof row.notes === 'string' ? row.notes.trim() : undefined;
+
+      if (name.length < 2) {
+        errors.push({ row: rowNum, name, email, error: 'Name must be at least 2 characters' });
+        return;
+      }
+      if (!EMAIL_REGEX.test(email)) {
+        errors.push({ row: rowNum, name, email, error: 'Invalid or missing email' });
+        return;
+      }
+      if (!VALID_SOURCES.includes(sourceRaw as LeadSource)) {
+        errors.push({ row: rowNum, name, email, error: `Source must be one of: ${VALID_SOURCES.join(', ')}` });
+        return;
+      }
+      const status = VALID_STATUSES.includes(statusRaw as LeadStatus) ? (statusRaw as LeadStatus) : 'New';
+
+      valid.push({ name, email, status, source: sourceRaw as LeadSource, notes });
+    });
+
+    const created = await Lead.insertMany(
+      valid.map((row) => ({ ...row, createdBy: req.user!.id })),
+      { ordered: false }
+    );
+
+    await Promise.all(
+      created.map((lead) =>
+        logActivity({
+          leadId: lead._id,
+          actorId: req.user!.id,
+          action: 'created',
+          message: `Lead imported via bulk CSV upload (source: ${lead.source})`,
+        })
+      )
+    );
+
+    sendSuccess(
+      res,
+      { createdCount: created.length, errorCount: errors.length, errors },
+      `Imported ${created.length} of ${rows.length} rows`,
+      created.length > 0 ? 201 : 400
+    );
+  } catch (error) {
+    console.error('BulkImportLeads error:', error);
+    sendError(res, 'Failed to import leads', 500);
   }
 };

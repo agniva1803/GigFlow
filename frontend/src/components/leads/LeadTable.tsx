@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Pencil, Trash2, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import type { Lead, PaginationMeta } from '../../types';
@@ -90,12 +91,12 @@ export const LeadTable = ({ leads, isLoading, pagination, onPageChange }: LeadTa
                 : leads.map((lead) => (
                   <tr key={lead._id} className="border-b transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50" style={{ borderColor: 'var(--border)' }}>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2.5">
+                      <Link to={`/leads/${lead._id}`} className="flex items-center gap-2.5 group">
                         <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-xs font-bold text-brand-600 dark:text-brand-400 flex-shrink-0">
                           {lead.name[0]?.toUpperCase()}
                         </div>
-                        <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{lead.name}</span>
-                      </div>
+                        <span className="font-medium group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors" style={{ color: 'var(--text-primary)' }}>{lead.name}</span>
+                      </Link>
                     </td>
                     <td className="px-4 py-3" style={{ color: 'var(--text-secondary)' }}>{lead.email}</td>
                     <td className="px-4 py-3"><StatusBadge status={lead.status} /></td>
