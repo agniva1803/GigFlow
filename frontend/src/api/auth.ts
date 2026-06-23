@@ -6,7 +6,6 @@ export const authApi = {
     name: string;
     email: string;
     password: string;
-    role?: 'admin' | 'sales';
   }) => {
     const response = await api.post<ApiResponse<AuthResponse>>('/auth/register', data);
     return response.data;

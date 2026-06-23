@@ -6,11 +6,10 @@ import { sendSuccess, sendError } from '../utils/response';
 
 export const register = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, email, password, role } = req.body as {
+    const { name, email, password } = req.body as {
       name: string;
       email: string;
       password: string;
-      role?: 'admin' | 'sales';
     };
 
     const existingUser = await User.findOne({ email });
@@ -19,7 +18,11 @@ export const register = async (req: AuthRequest, res: Response): Promise<void> =
       return;
     }
 
-    const user = await User.create({ name, email, password, role: role ?? 'sales' });
+    // Public registration always creates a "sales" account. Admin accounts
+    // are never self-selected — accepting a client-supplied role here would
+    // let anyone register as admin and get full cross-tenant lead access.
+    // Admins are provisioned via the seed script or directly in the database.
+    const user = await User.create({ name, email, password, role: 'sales' });
 
     const token = generateToken(user._id.toString(), user.role);
 

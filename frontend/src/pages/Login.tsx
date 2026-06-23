@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Zap, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authApi } from '../api/auth';
 import { useAuthStore } from '../store/authStore';
@@ -56,9 +56,7 @@ export const LoginPage = () => {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2.5 mb-3">
-            <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+            <img src="/assets/logo-mark.svg" alt="GigFlow" className="w-10 h-10 rounded-xl shadow-lg" />
             <span className="font-display font-bold text-2xl" style={{ color: 'var(--text-primary)' }}>
               GigFlow
             </span>
@@ -123,14 +121,16 @@ export const LoginPage = () => {
           </p>
         </div>
 
-        {/* Demo credentials */}
-        <div className="mt-4 card p-4 text-xs" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
-          <p className="font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Demo Credentials</p>
-          <div className="space-y-1" style={{ color: 'var(--text-muted)' }}>
-            <p><span className="font-mono">admin@gigflow.com</span> / <span className="font-mono">admin123</span> (Admin)</p>
-            <p><span className="font-mono">sales@gigflow.com</span> / <span className="font-mono">sales123</span> (Sales)</p>
+        {/* Demo credentials — shown only when explicitly enabled for the public demo deployment */}
+        {import.meta.env.VITE_SHOW_DEMO_CREDENTIALS === 'true' && (
+          <div className="mt-4 card p-4 text-xs" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border)' }}>
+            <p className="font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>Demo Credentials</p>
+            <div className="space-y-1" style={{ color: 'var(--text-muted)' }}>
+              <p><span className="font-mono">admin@gigflow.com</span> / <span className="font-mono">admin123</span> (Admin)</p>
+              <p><span className="font-mono">sales@gigflow.com</span> / <span className="font-mono">sales123</span> (Sales)</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

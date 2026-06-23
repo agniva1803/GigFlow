@@ -2,9 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import mongoose from 'mongoose';
-import bcrypt from 'bcryptjs';
 import User from '../models/User';
 import Lead from '../models/Lead';
+import Activity from '../models/Activity';
 
 const MONGODB_URI = process.env.MONGODB_URI ?? 'mongodb://localhost:27017/gigflow';
 
@@ -15,23 +15,22 @@ const seed = async () => {
   // Clear existing data
   await User.deleteMany({});
   await Lead.deleteMany({});
+  await Activity.deleteMany({});
   console.log('🗑️  Cleared existing data');
 
-  // Create users
-  const adminPassword = await bcrypt.hash('admin123', 12);
-  const salesPassword = await bcrypt.hash('sales123', 12);
-
+  // Create users — pass plaintext passwords, the User model's pre-save hook
+  // hashes them. Hashing here too would double-hash and break login.
   const admin = await User.create({
     name: 'Admin User',
     email: 'admin@gigflow.com',
-    password: adminPassword,
+    password: 'admin123',
     role: 'admin',
   });
 
   const sales = await User.create({
     name: 'Sales Rep',
     email: 'sales@gigflow.com',
-    password: salesPassword,
+    password: 'sales123',
     role: 'sales',
   });
 
@@ -51,8 +50,18 @@ const seed = async () => {
     { name: 'Arun Krishnan', email: 'arun.krishnan@example.com', status: 'Lost', source: 'Referral', createdBy: sales._id },
   ];
 
-  await Lead.insertMany(sampleLeads);
+  const createdLeads = await Lead.insertMany(sampleLeads);
   console.log(`📋 Created ${sampleLeads.length} sample leads`);
+
+  await Activity.insertMany(
+    createdLeads.map((lead) => ({
+      lead: lead._id,
+      actor: lead.createdBy,
+      action: 'created',
+      message: `Lead created from ${lead.source}`,
+    }))
+  );
+  console.log('🧾 Seeded activity log entries');
 
   await mongoose.disconnect();
   console.log('✅ Seeding complete! Disconnected from MongoDB.');

@@ -1,20 +1,19 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Zap, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authApi } from '../api/auth';
 import { useAuthStore } from '../store/authStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'sales' as 'admin' | 'sales' });
+  const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validate = () => {
@@ -58,9 +57,7 @@ export const RegisterPage = () => {
       <div className="relative w-full max-w-sm animate-fade-in">
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2.5 mb-3">
-            <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+            <img src="/assets/logo-mark.svg" alt="GigFlow" className="w-10 h-10 rounded-xl shadow-lg" />
             <span className="font-display font-bold text-2xl" style={{ color: 'var(--text-primary)' }}>GigFlow</span>
           </div>
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Smart Leads Dashboard</p>
@@ -105,12 +102,6 @@ export const RegisterPage = () => {
               </div>
               {errors.password && <p className="mt-1.5 text-xs text-red-500">{errors.password}</p>}
             </div>
-            <Select
-              label="Role"
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value as 'admin' | 'sales' })}
-              options={[{ value: 'sales', label: 'Sales Rep' }, { value: 'admin', label: 'Admin' }]}
-            />
             <Button type="submit" className="w-full" isLoading={isLoading}>Create Account</Button>
           </form>
 

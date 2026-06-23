@@ -1,36 +1,47 @@
 import { Router, Request, Response } from 'express';
 import User from '../models/User';
 import Lead from '../models/Lead';
+import Activity from '../models/Activity';
 
 const router = Router();
 
 const runSeed = async (req: Request, res: Response): Promise<void> => {
-  const secret = req.headers['x-seed-secret'] || req.query['secret'];
-  if (secret !== 'gigflow-seed-2024') {
-    res.status(403).json({ error: 'Forbidden' });
+  const configuredSecret = process.env.SEED_SECRET;
+  const seedEnabled = process.env.ENABLE_SEED_ROUTE === 'true';
+
+  // The seed route wipes the database, so it is opt-in via env var and
+  // requires a secret that is never committed to source control. Without
+  // both conditions met, the route behaves as if it doesn't exist.
+  if (!seedEnabled || !configuredSecret) {
+    res.status(404).json({ success: false, message: 'Not found' });
     return;
   }
 
-  // Prevent caching
+  const providedSecret = req.headers['x-seed-secret'] || req.query['secret'];
+  if (providedSecret !== configuredSecret) {
+    res.status(403).json({ success: false, message: 'Forbidden' });
+    return;
+  }
+
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
 
   try {
     await User.deleteMany({});
     await Lead.deleteMany({});
+    await Activity.deleteMany({});
 
     const admin = await User.create({
       name: 'Admin User',
       email: 'admin@gigflow.com',
       password: 'admin123',
-      role: 'admin'
+      role: 'admin',
     });
 
     const sales = await User.create({
       name: 'Sales Rep',
       email: 'sales@gigflow.com',
       password: 'sales123',
-      role: 'sales'
+      role: 'sales',
     });
 
     await Lead.insertMany([
@@ -46,19 +57,14 @@ const runSeed = async (req: Request, res: Response): Promise<void> => {
       { name: 'Arun Krishnan', email: 'arun.krishnan@example.com', status: 'Lost', source: 'Referral', createdBy: sales._id },
     ]);
 
-    const adminUser = await User.findOne({ email: 'admin@gigflow.com' }).select('+password');
-    const passwordCheck = adminUser ? await adminUser.comparePassword('admin123') : false;
-
     res.json({
       success: true,
-      message: '✅ Database seeded!',
-      passwordVerified: passwordCheck,
-      adminId: admin._id,
+      message: 'Database seeded',
       users: ['admin@gigflow.com / admin123', 'sales@gigflow.com / sales123'],
-      leads: '10 leads created'
+      leads: 10,
     });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    res.status(500).json({ success: false, message: (err as Error).message });
   }
 };
 

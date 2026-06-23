@@ -16,10 +16,6 @@ export const registerValidator = [
     .notEmpty().withMessage('Password is required')
     .isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
     .matches(/^(?=.*[A-Za-z])(?=.*\d)/).withMessage('Password must contain at least one letter and one number'),
-
-  body('role')
-    .optional()
-    .isIn(['admin', 'sales']).withMessage('Role must be admin or sales'),
 ];
 
 export const loginValidator = [
