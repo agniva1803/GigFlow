@@ -7,7 +7,7 @@ import { AuthRequest, LeadFilterQuery, LeadStatus, LeadSource } from '../types';
 import { sendSuccess, sendError } from '../utils/response';
 import { logActivity, buildUpdateActivities } from '../utils/activityLogger';
 import { sendEmail, buildLeadAssignedEmail, buildStatusChangedEmail } from '../utils/email';
-import { FilterQuery } from 'mongoose';
+import mongoose, { FilterQuery } from 'mongoose';
 import { ILead } from '../types';
 
 export const getLeads = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -331,8 +331,13 @@ export const exportLeadsCSV = async (req: AuthRequest, res: Response): Promise<v
 // Admin only: get all users
 export const getStats = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    // Mongoose auto-casts a string id to ObjectId for find()/countDocuments(),
+    // but NOT inside an aggregate() $match stage — that talks to MongoDB more
+    // directly and needs an explicit cast, or every $group stage below
+    // silently matches zero documents while countDocuments (cast correctly)
+    // still returns the right total. Hence: total=1 but every bucket=0.
     const filter: FilterQuery<ILead> =
-      req.user?.role === 'sales' ? { createdBy: req.user.id } : {};
+      req.user?.role === 'sales' ? { createdBy: new mongoose.Types.ObjectId(req.user.id) } : {};
 
     const [total, byStatus, bySource] = await Promise.all([
       Lead.countDocuments(filter),

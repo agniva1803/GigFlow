@@ -268,9 +268,36 @@ describe('Leads API', () => {
       const res = await request(app).get('/api/leads/stats').set('Authorization', `Bearer ${repA.token}`);
 
       expect(res.body.data.total).toBe(2); // only repA's leads
+
+      // Regression test: the role filter passed into Lead.aggregate() must use
+      // an ObjectId, not a raw string. Mongoose auto-casts string ids for
+      // find()/countDocuments() but NOT inside an aggregate() $match stage,
+      // so a raw-string filter here previously made every $group bucket
+      // come back as 0 while `total` (computed via countDocuments) still
+      // looked correct — exactly the kind of bug a top-level count alone
+      // would not catch.
+      expect(res.body.data.byStatus.New).toBe(2);
+      expect(res.body.data.byStatus.Contacted).toBe(0);
+      expect(res.body.data.byStatus.Qualified).toBe(0);
+      expect(res.body.data.byStatus.Lost).toBe(0);
+
       expect(res.body.data.bySource.Website).toBe(1);
       expect(res.body.data.bySource.Instagram).toBe(1);
-      expect(res.body.data.bySource.Referral).toBe(0);
+      expect(res.body.data.bySource.Referral).toBe(0); // repB's lead, must not leak into repA's stats
+    });
+
+    it('admin sees aggregated stats across every sales rep', async () => {
+      const admin = await registerAndLogin({ email: 'stats-admin@example.com', role: 'admin' });
+      const rep = await registerAndLogin({ email: 'stats-rep-for-admin@example.com', role: 'sales' });
+
+      await createLead(admin.token, { name: 'Admin Lead', email: 'al@example.com', source: 'Website' });
+      await createLead(rep.token, { name: 'Rep Lead', email: 'rl@example.com', source: 'Referral' });
+
+      const res = await request(app).get('/api/leads/stats').set('Authorization', `Bearer ${admin.token}`);
+
+      expect(res.body.data.total).toBe(2);
+      expect(res.body.data.bySource.Website).toBe(1);
+      expect(res.body.data.bySource.Referral).toBe(1);
     });
   });
 });
